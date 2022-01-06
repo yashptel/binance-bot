@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
 	"strconv"
+	"sync"
 
 	binance "github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
@@ -17,12 +19,66 @@ const (
 )
 
 const (
-	diff       = 0.01
+	diff       = 10.01
 	symbol     = "BTCUSDT"
-	entryPrice = 56601.30
+	entryPrice = 42960.30
 )
 
+var mu sync.Mutex
+var trades int
+
+func takeTrade() {
+	mu.Lock()
+	defer mu.Unlock()
+	// fmt.Println("Trying to take trade")
+	if trades == 0 {
+		fmt.Println("Taking trade")
+
+		// Create a new client
+		futuresClient := binance.NewFuturesClient(apiKey, secretKey)
+
+		// Create a new order
+		mainOrder := futuresClient.NewCreateOrderService()
+		mainOrder.Symbol(symbol)
+		mainOrder.Side(futures.SideTypeBuy)
+		mainOrder.PositionSide(futures.PositionSideTypeLong)
+		mainOrder.Type(futures.OrderTypeMarket)
+		mainOrder.Quantity("0.1")
+
+		// Create a new order
+		stopLossOrder := futuresClient.NewCreateOrderService()
+		stopLossOrder.Symbol(symbol)
+		stopLossOrder.Side(futures.SideTypeSell)
+		stopLossOrder.PositionSide(futures.PositionSideTypeLong)
+		stopLossOrder.Type(futures.OrderTypeStopMarket)
+		stopLossOrder.Quantity("0.1")
+		stopLossOrder.StopPrice("39000.30")
+		stopLossOrder.TimeInForce(futures.TimeInForceTypeGTC)
+
+		// res, err := order.Do(context.Background())
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
+
+		// data, _ := json.Marshal(res)
+		// fmt.Println(data)
+
+		batchOrdersService := futuresClient.NewCreateBatchOrdersService()
+		batchOrdersService.OrderList([]*futures.CreateOrderService{mainOrder, stopLossOrder})
+		res, err := batchOrdersService.Do(context.Background())
+		if err != nil {
+			log.Fatal(err)
+		}
+		data, _ := json.Marshal(res)
+		fmt.Println(string(data))
+
+		trades++
+	}
+}
+
 func main() {
+
+	futures.UseTestnet = true
 
 	// Create a new client
 	futuresClient := binance.NewFuturesClient(apiKey, secretKey)
@@ -39,7 +95,8 @@ func main() {
 
 		priceDiff := getPercentageDiff(entryPrice, price)
 		if priceDiff <= diff {
-			fmt.Println("Price diff: ", priceDiff, " %", " Price: ", price)
+			// fmt.Println("Price diff: ", priceDiff, " %", " Price: ", price)
+			takeTrade()
 		}
 	}
 
