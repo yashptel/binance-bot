@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
+	"math"
+	"strconv"
 
+	binance "github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
 )
 
@@ -14,35 +16,69 @@ const (
 	secretKey = ""
 )
 
-func main() {
-	// futures.UseTestnet = true
+const (
+	diff       = 0.01
+	symbol     = "BTCUSDT"
+	entryPrice = 56601.30
+)
 
-	futuresClient := futures.NewClient(apiKey, secretKey) // USDT-M Futures
-	// order, err := futuresClient.NewCreateOrderService().Symbol("BTCUSDT").Do(context.Background())
+func main() {
+
+	// Create a new client
+	futuresClient := binance.NewFuturesClient(apiKey, secretKey)
+
+	errHandler := func(err error) {
+		fmt.Println(err)
+	}
+
+	WsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
+		price, err := strconv.ParseFloat(event.Price, 64)
+		if err != nil {
+			log.Println(err)
+		}
+
+		priceDiff := getPercentageDiff(entryPrice, price)
+		if priceDiff <= diff {
+			fmt.Println("Price diff: ", priceDiff, " %", " Price: ", price)
+		}
+	}
+
+	doneC, _, _ := futures.WsAggTradeServe(symbol, WsAggTradeHandler, errHandler)
+	<-doneC
+
+	res, err := futuresClient.NewExchangeInfoService().Do(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	futuresClient.NewChangeLeverageService().Symbol("ETHUSDT").Leverage(55).Do(context.Background())
+
+	for _, v := range res.Symbols {
+		if v.Status == "TRADING" && v.ContractType == "PERPETUAL" {
+			// res, _ := client.NewGetLeverageBracketService().Symbol(v.Symbol).Do(context.Background())
+			// data, _ := json.Marshal(res)
+			fmt.Println(v.Symbol)
+			// fmt.Println(string(data))
+		}
+	}
+
+	// client.NewListPricesService().Symbol("BTCUSDT").Do(context.Background())
+
+	// data, _ := json.Marshal(order)
+	// fmt.Println(string(data), err)
+
+	// orders, err := futuresClient.NewListOrdersService().Symbol("BTCUSDT").Do(context.Background())
 	// if err != nil {
 	// 	log.Println(err)
 	// }
 
-	order, err := futuresClient.NewCreateOrderService().Symbol("BTCUSDT").Type("LIMIT").Side("BUY").TimeInForce("GTC").Quantity("0.001").Price("0.000001").Do(context.Background())
-	if err != nil {
-		log.Println(err)
-	}
+	// for _, order := range orders {
+	// 	if order.Price == "56601.30" {
+	// 		data, _ := json.Marshal(order)
+	// 		fmt.Println(string(data))
+	// 	}
+	// }
+}
 
-	// order, err := futuresClient.OrderTypeStopMarket().OrderList([]*futures.CreateOrderService{}).Type(futures.OrderTypeStopMarket).Symbol("ADAUSDT").Side(futures.SideTypeBuy).PositionSide(futures.PositionSideTypeLong).Quantity("10").StopPrice("2.0").Do(context.Background())
-
-	data, _ := json.Marshal(order)
-	fmt.Println(string(data), err)
-
-	orders, err := futuresClient.NewListOrdersService().Symbol("BTCUSDT").Do(context.Background())
-	if err != nil {
-		log.Println(err)
-	}
-
-	for _, order := range orders {
-		if order.Price == "56601.30" {
-			data, _ := json.Marshal(order)
-			fmt.Println(string(data))
-		}
-	}
-	println("Hello World")
+func getPercentageDiff(v1, v2 float64) float64 {
+	return (math.Abs(v1-v2) / ((v1 + v2) / 2)) * 100
 }
