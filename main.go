@@ -11,6 +11,7 @@ import (
 
 	binance "github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
+	"github.com/yashptel/binance-bot/pkg/models"
 )
 
 const (
@@ -77,6 +78,25 @@ func takeTrade() {
 }
 
 func main() {
+
+	orderRepo, err := models.NewOrderModel()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = orderRepo.Create(&models.Order{
+		ID:          "1",
+		UserID:      "1",
+		ProductID:   "1",
+		ProductName: "1",
+		Quantity:    1,
+		Price:       1,
+		Status:      "1",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return
 
 	futures.UseTestnet = true
 
