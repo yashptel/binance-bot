@@ -16,3 +16,6 @@ vendor/
 
 # Firebase key
 firebase-key.json
+
+# envs
+.env 
