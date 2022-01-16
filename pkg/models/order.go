@@ -64,6 +64,7 @@ type OrderRepositoryImpl struct {
 
 type OrderRepository interface {
 	GetAll() ([]*Order, error)
+	GetAllAsMap() (map[string][]*Order, error)
 	Create(order *Order) (*Order, error)
 	Get(id string) (*Order, error)
 	Delete(id string) error
@@ -103,6 +104,27 @@ func (o OrderRepositoryImpl) GetAll() ([]*Order, error) {
 		var order Order
 		doc.DataTo(&order)
 		orders = append(orders, &order)
+	}
+	return orders, nil
+}
+
+func (o OrderRepositoryImpl) GetAllAsMap() (map[string][]*Order, error) {
+	var orders map[string][]*Order
+	iter := o.db.Collection("orders").Documents(context.Background())
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var order Order
+		doc.DataTo(&order)
+		if orders[order.Symbol] == nil {
+			orders[order.Symbol] = []*Order{}
+		}
+		orders[order.Symbol] = append(orders[order.Symbol], &order)
 	}
 	return orders, nil
 }
