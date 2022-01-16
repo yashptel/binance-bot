@@ -109,7 +109,8 @@ func (o OrderRepositoryImpl) GetAll() ([]*Order, error) {
 }
 
 func (o OrderRepositoryImpl) GetAllAsMap() (map[string][]*Order, error) {
-	var orders map[string][]*Order
+	// var orders map[string][]*Order
+	orders := make(map[string][]*Order)
 	iter := o.db.Collection("orders").Documents(context.Background())
 	for {
 		doc, err := iter.Next()

@@ -97,17 +97,17 @@ func main() {
 	// 	StopLoss:     0.5,
 	// })
 
-	orders, err := orderRepo.GetAll()
-	if err != nil {
-		log.Fatal(err)
-	}
+	// orders, err := orderRepo.GetAll()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	for _, order := range orders {
-		data, _ := json.Marshal(order)
-		fmt.Println(string(data))
-	}
+	// for _, order := range orders {
+	// 	data, _ := json.Marshal(order)
+	// 	fmt.Println(string(data))
+	// }
 
-	return
+	// return
 
 	futures.UseTestnet = true
 
@@ -118,21 +118,46 @@ func main() {
 		fmt.Println(err)
 	}
 
-	WsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
-		price, err := strconv.ParseFloat(event.Price, 64)
-		if err != nil {
-			log.Println(err)
-		}
+	orders, err := orderRepo.GetAllAsMap()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-		priceDiff := utils.GetPercentageDiff(entryPrice, price)
-		if priceDiff <= diff {
-			// fmt.Println("Price diff: ", priceDiff, " %", " Price: ", price)
-			takeTrade(orderRepo)
+	// WsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
+	// 	price, err := strconv.ParseFloat(event.Price, 64)
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 	}
+
+	// 	priceDiff := utils.GetPercentageDiff(entryPrice, price)
+	// 	if priceDiff <= diff {
+	// 		// fmt.Println("Price diff: ", priceDiff, " %", " Price: ", price)
+	// 		takeTrade(orderRepo)
+	// 	}
+	// }
+
+	WsAllMarketTickerHandler := func(event futures.WsAllMarketTickerEvent) {
+		for _, ticker := range event {
+			if orders[ticker.Symbol] != nil {
+				price, err := strconv.ParseFloat(ticker.ClosePrice, 64)
+				if err != nil {
+					log.Println(err)
+				}
+				fmt.Println(ticker.Symbol, " Price: ", price)
+				priceDiff := utils.GetPercentageDiff(entryPrice, price)
+				if priceDiff <= diff {
+					fmt.Println("Price diff: ", priceDiff, " %", " Price: ", price)
+					// takeTrade(orderRepo)
+				}
+			}
 		}
 	}
 
-	doneC, _, _ := futures.WsAggTradeServe(symbol, WsAggTradeHandler, errHandler)
+	doneC, _, _ := futures.WsAllMarketTickerServe(WsAllMarketTickerHandler, errHandler)
 	<-doneC
+
+	// doneC, _, _ := futures.WsAggTradeServe(symbol, WsAggTradeHandler, errHandler)
+	// <-doneC
 
 	res, err := futuresClient.NewExchangeInfoService().Do(context.Background())
 	if err != nil {
