@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"strconv"
 	"sync"
 
 	binance "github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
+	"github.com/yashptel/binance-bot/pkg/config"
 	"github.com/yashptel/binance-bot/pkg/models"
+	"github.com/yashptel/binance-bot/pkg/utils"
 )
 
 const (
@@ -28,7 +29,7 @@ const (
 var mu sync.Mutex
 var trades int
 
-func takeTrade() {
+func takeTrade(orderRepo models.OrderRepository) {
 	mu.Lock()
 	defer mu.Unlock()
 	// fmt.Println("Trying to take trade")
@@ -70,6 +71,7 @@ func takeTrade() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		data, _ := json.Marshal(res)
 		fmt.Println(string(data))
 
@@ -79,29 +81,38 @@ func takeTrade() {
 
 func main() {
 
+	cfg := config.GetConfig().Binance
+
 	orderRepo, err := models.NewOrderModel()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = orderRepo.Create(&models.Order{
-		ID:          "1",
-		UserID:      "1",
-		ProductID:   "1",
-		ProductName: "1",
-		Quantity:    1,
-		Price:       1,
-		Status:      "1",
-	})
+	// err = orderRepo.Create(&models.Order{
+	// 	Symbol:       "ETHUSDT",
+	// 	Price:        3353.00,
+	// 	Qty:          "2.4",
+	// 	Side:         futures.SideTypeBuy,
+	// 	PositionSide: futures.PositionSideTypeLong,
+	// 	StopLoss:     0.5,
+	// })
+
+	orders, err := orderRepo.GetAll()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	for _, order := range orders {
+		data, _ := json.Marshal(order)
+		fmt.Println(string(data))
+	}
+
 	return
 
 	futures.UseTestnet = true
 
 	// Create a new client
-	futuresClient := binance.NewFuturesClient(apiKey, secretKey)
+	futuresClient := binance.NewFuturesClient(cfg.APIKey, cfg.APISecret)
 
 	errHandler := func(err error) {
 		fmt.Println(err)
@@ -113,10 +124,10 @@ func main() {
 			log.Println(err)
 		}
 
-		priceDiff := getPercentageDiff(entryPrice, price)
+		priceDiff := utils.GetPercentageDiff(entryPrice, price)
 		if priceDiff <= diff {
 			// fmt.Println("Price diff: ", priceDiff, " %", " Price: ", price)
-			takeTrade()
+			takeTrade(orderRepo)
 		}
 	}
 
@@ -154,8 +165,4 @@ func main() {
 	// 		fmt.Println(string(data))
 	// 	}
 	// }
-}
-
-func getPercentageDiff(v1, v2 float64) float64 {
-	return (math.Abs(v1-v2) / ((v1 + v2) / 2)) * 100
 }

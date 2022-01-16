@@ -3,11 +3,13 @@ package db
 import (
 	"context"
 	"fmt"
-	"os"
+	"log"
+	"path"
 	"sync"
 
 	firestore "cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
+	"github.com/yashptel/binance-bot/pkg/config"
 
 	"google.golang.org/api/option"
 )
@@ -21,8 +23,14 @@ func Connect() (*firestore.Client, error) {
 	once.Do(func() {
 		var app *firebase.App
 
-		dir, _ := os.Getwd()
-		keyPath := dir + "/firebase-key.json"
+		cfg := config.GetConfig()
+		root, err := config.GetRootDir()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		keyPath := path.Join(root, cfg.Firebase.KeyPath)
 
 		opt := option.WithCredentialsFile(keyPath)
 
@@ -32,6 +40,10 @@ func Connect() (*firestore.Client, error) {
 			return
 		}
 		conn, err = app.Firestore(context.Background())
+		if err != nil {
+			fmt.Printf("error initializing firestore: %v\n", err)
+			return
+		}
 	})
 	return conn, err
 }
